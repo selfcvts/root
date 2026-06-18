@@ -735,7 +735,6 @@ const labelStyle = { display: "block", fontSize: 11, color: "#5a5450", textTrans
   <p>{post.content}</p>
   <span>Rep: {post.author_reputation}</span>
 </div>
-import React, { useState } from 'react';
 function ThreadView({ threadId }) {
   const [replies, setReplies] = useState([]);
 
