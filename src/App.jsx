@@ -788,3 +788,107 @@ function ReplyCard({ reply, allReplies, onQuote, onReact }) {
     </div>
   );
 }
+import React, { useState, useEffect } from 'react';
+import { fetchThreadReplies, handleReplyReaction } from './rotApi';
+
+function ThreadView({ threadId }) {
+  const [replies, setReplies] = useState([]);
+
+  // Load initial replies when component mounts
+  useEffect(() => {
+    async function loadData() {
+      const data = await fetchThreadReplies(threadId);
+      setReplies(data);
+    }
+    loadData();
+  }, [threadId]);
+
+  // Handle the click event, save to DB, and update local state
+  const onReactToReply = async (replyId, authorId, type) => {
+    try {
+      // 1. Save it to Supabase via your API function
+      await handleReplyReaction(replyId, authorId, type);
+
+      // 2. Map through local state and update the counts instantly on screen
+      setReplies(prevReplies => 
+        prevReplies.map(reply => {
+          if (reply.id === replyId) {
+            let repChange = 0;
+            let fieldToIncrement = '';
+
+            if (type === 'like') { repChange = 1; fieldToIncrement = 'likes'; }
+            if (type === 'dislike') { repChange = -1; fieldToIncrement = 'dislikes'; }
+            if (type === 'mega_rep') { repChange = 10; fieldToIncrement = 'mega_reps'; }
+            if (type === 'mega_dislike') { repChange = -10; fieldToIncrement = 'mega_dislikes'; }
+
+            return {
+              ...reply,
+              [fieldToIncrement]: (reply[fieldToIncrement] || 0) + 1,
+              profiles: {
+                ...reply.profiles,
+                // Update the author's total profile reputation shown on their avatar card
+                reputation: (reply.profiles?.reputation || 0) + repChange
+              }
+            };
+          }
+          return reply;
+        })
+      );
+    } catch (err) {
+      console.error("Failed to save reaction:", err);
+    }
+  };
+
+  return (
+    <div className="replies-list">
+      {replies.map(reply => (
+        <ReplyCard 
+          key={reply.id} 
+          reply={reply} 
+          allReplies={replies} 
+          onReact={onReactToReply}
+          onQuote={(r) => console.log("Quoting: ", r)}
+        />
+      ))}
+    </div>
+  );
+}
+function ReplyCard({ reply, allReplies, onReact, onQuote }) {
+  return (
+    <div className="forum-post" style={{ display: 'flex', background: '#111', color: '#fff', border: '1px solid #222', marginBottom: '10px' }}>
+      
+      {/* SIDEBAR: Shows the overall reputation balance of the user */}
+      <div className="user-sidebar" style={{ width: '160px', padding: '15px', borderRight: '1px solid #222', textAlign: 'center' }}>
+        <img src={reply.profiles?.profile_picture || 'default-avatar.png'} style={{ width: '80px', height: '80px', borderRadius: '4px' }} alt="Avatar" />
+        <h4 style={{ color: reply.profiles?.custom_theme_color, margin: '5px 0' }}>{reply.profiles?.username}</h4>
+        
+        {/* Total Rep Count box under username */}
+        <div style={{ background: '#1a1a1a', padding: '4px', borderRadius: '3px', fontSize: '12px', marginTop: '5px' }}>
+          Reputation: <span style={{ color: '#4caf50', fontWeight: 'bold' }}>{reply.profiles?.reputation}</span>
+        </div>
+      </div>
+
+      {/* BODY: Text and specific reaction counts for this explicit post */}
+      <div className="post-body" style={{ flex: 1, padding: '15px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <p style={{ fontFamily: reply.font_family, fontSize: reply.font_size }}>{reply.content}</p>
+        
+        {/* BOTTOM BAR: Displays individual counts for this specific post */}
+        <div className="post-footer" style={{ display: 'flex', gap: '15px', borderTop: '1px solid #222', paddingTop: '10px', fontSize: '12px' }}>
+          <span style={{ color: '#4caf50', cursor: 'pointer' }} onClick={() => onReact(reply.id, reply.author_id, 'like')}>
+            👍 Likes ({reply.likes || 0})
+          </span>
+          <span style={{ color: '#f44336', cursor: 'pointer' }} onClick={() => onReact(reply.id, reply.author_id, 'dislike')}>
+            👎 Dislikes ({reply.dislikes || 0})
+          </span>
+          <span style={{ color: '#ffc107', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => onReact(reply.id, reply.author_id, 'mega_rep')}>
+            ⚡ Mega Reps ({reply.mega_reps || 0})
+          </span>
+          <span style={{ color: '#d9534f', cursor: 'pointer' }} onClick={() => onReact(reply.id, reply.author_id, 'mega_dislike')}>
+            💀 Mega Dislikes ({reply.mega_dislikes || 0})
+          </span>
+        </div>
+      </div>
+
+    </div>
+  );
+}
