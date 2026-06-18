@@ -218,3 +218,100 @@ export async function checkIn(username) {
   const newStreak = isYesterday(user.last_check_in, now) ? (user.streak || 0) + 1 : 1;
   return updateUser(username, { streak: newStreak, last_check_in: new Date(now).toISOString() });
 }
+import { supabase } from './supabaseClient';
+
+// Function to handle the reputation logic (+1, -1, +10, -10)
+export const handleReaction = async (postId, authorId, userId, type) => {
+  let repChange = 0;
+  if (type === 'like') repChange = 1;
+  if (type === 'dislike') repChange = -1;
+  if (type === 'mega_rep') repChange = 10;
+  if (type === 'mega_dislike') repChange = -10;
+
+  // 1. Fetch current reputation
+  const { data: profile } = await supabase.from('profiles').select('reputation').eq('id', authorId).single();
+  
+  // 2. Update author's reputation
+  await supabase.from('profiles').update({ reputation: (profile.reputation || 0) + repChange }).eq('id', authorId);
+};
+
+// Function to donate reputation to someone else
+export const donateReputation = async (donorId, recipientId, amount) => {
+  const { data: donor } = await supabase.from('profiles').select('reputation').eq('id', donorId).single();
+  const { data: recipient } = await supabase.from('profiles').select('reputation').eq('id', recipientId).single();
+
+  if (donor.reputation < amount) return { error: 'Insufficient reputation' };
+
+  await supabase.from('profiles').update({ reputation: donor.reputation - amount }).eq('id', donorId);
+  await supabase.from('profiles').update({ reputation: recipient.reputation + amount }).eq('id', recipientId);
+  return { success: true };
+};
+
+// Admin initializer logic for 'triste'
+export const initializeAdminUser = async () => {
+  const { data } = await supabase.from('profiles').select('id').eq('username', 'triste');
+  if (data.length === 0) {
+    // Note: If you use Supabase Auth, you normally create users via supabase.auth.signUp
+    await supabase.from('profiles').insert([
+      { username: 'triste', role: 'admin', custom_badge: 'Special Elite', reputation: 100 }
+    ]);
+  }
+};
+import { supabase } from './supabaseClient';
+
+// 1. Fetch all replies for a thread including author profile decorations
+export const fetchThreadReplies = async (threadId) => {
+  const { data, error } = await supabase
+    .from('replies')
+    .select(`
+      *,
+      profiles:author_id (username, reputation, custom_badge, profile_picture, custom_theme_color)
+    `)
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data;
+};
+
+// 2. Submit a new reply (handles custom formatting parameters)
+export const createReply = async ({ threadId, authorId, content, parentReplyId = null, formatting }) => {
+  const { data, error } = await supabase
+    .from('replies')
+    .insert([
+      {
+        thread_id: threadId,
+        author_id: authorId,
+        parent_reply_id: parentReplyId,
+        content: content,
+        font_family: formatting.fontFamily || 'Default',
+        font_size: formatting.fontSize || '14px',
+        is_bold: formatting.isBold || false,
+        is_italic: formatting.isItalic || false,
+        font_color: formatting.fontColor || '#ffffff'
+      }
+    ])
+    .select();
+
+  if (error) throw error;
+  return data[0];
+};
+
+// 3. React specifically to a reply & update target author profile rep balance
+export const handleReplyReaction = async (replyId, authorId, type) => {
+  let repChange = 0;
+  let incrementField = '';
+
+  if (type === 'like') { repChange = 1; incrementField = 'likes'; }
+  if (type === 'dislike') { repChange = -1; incrementField = 'dislikes'; }
+  if (type === 'mega_rep') { repChange = 10; incrementField = 'mega_reps'; }
+  if (type === 'mega_dislike') { repChange = -10; incrementField = 'mega_dislikes'; }
+
+  // Update reply counts
+  const { data: reply } = await supabase.from('replies').select(incrementField).eq('id', replyId).single();
+  await supabase.from('replies').update({ [incrementField]: (reply[incrementField] || 0) + 1 }).eq('id', replyId);
+
+  // Cascade the reputation point change down to the author's overall profile balance
+  const { data: profile } = await supabase.from('profiles').select('reputation').eq('id', authorId).single();
+  await supabase.from('profiles').update({ reputation: (profile.reputation || 0) + repChange }).eq('id', authorId);
+};

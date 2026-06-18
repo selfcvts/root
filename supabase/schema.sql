@@ -111,3 +111,52 @@ create policy "votes are public" on rot_votes for select using (true);
 create policy "anyone can vote" on rot_votes for insert with check (true);
 create policy "anyone can change their vote" on rot_votes for update using (true);
 create policy "anyone can remove their vote" on rot_votes for delete using (true);
+-- 1. Add custom profile and rep columns to your users/profiles table
+ALTER TABLE profiles 
+ADD COLUMN IF NOT EXISTS reputation INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user',
+ADD COLUMN IF NOT EXISTS custom_badge TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS profile_picture TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS profile_banner TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS profile_message TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS profile_music_url TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS custom_theme_color TEXT DEFAULT '#ffffff',
+ADD COLUMN IF NOT EXISTS preferred_font TEXT DEFAULT 'Default';
+
+-- 2. Create the exact thread categories structure
+CREATE TABLE IF NOT EXISTS categories (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    allowed_roles_write TEXT[] DEFAULT '{"all"}'
+);
+
+INSERT INTO categories (name, allowed_roles_write) VALUES
+('News', '{"admin"}'),
+('Best of the Best', '{"mod", "admin"}'),
+('Looksmaxxing', '{"all"}'),
+('Looksmaxxing Questions', '{"all"}'),
+('Rate Me', '{"all"}'),
+('Off Topic', '{"all"}'),
+('Different Languages', '{"all"}')
+ON CONFLICT (name) DO NOTHING;
+-- Create Replies Table
+CREATE TABLE IF NOT EXISTS replies (
+    id SERIAL PRIMARY KEY,
+    thread_id INT REFERENCES threads(id) ON DELETE CASCADE,
+    author_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    parent_reply_id INT REFERENCES replies(id) ON DELETE SET NULL, -- For nesting/quoting someone else's reply
+    content TEXT NOT NULL,
+    font_family TEXT DEFAULT 'Default',
+    font_size TEXT DEFAULT '14px',
+    is_bold BOOLEAN DEFAULT false,
+    is_italic BOOLEAN DEFAULT false,
+    font_color TEXT DEFAULT '#ffffff',
+    likes INT DEFAULT 0,
+    dislikes INT DEFAULT 0,
+    mega_reps INT DEFAULT 0,
+    mega_dislikes INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for speedy loading of large thread conversations
+CREATE INDEX IF NOT EXISTS idx_replies_thread ON replies(thread_id);

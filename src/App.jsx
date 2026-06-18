@@ -724,3 +724,67 @@ function AuthModal({ onClose, onLogin, showToast }) {
 }
 
 const labelStyle = { display: "block", fontSize: 11, color: "#5a5450", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 };
+// Inside your post rendering loop in App.jsx
+<div style={{ 
+  fontFamily: post.author_preferred_font, 
+  color: post.author_custom_theme_color || '#fff' 
+}}>
+  <p>{post.content}</p>
+  <span>Rep: {post.author_reputation}</span>
+</div>
+import React, { useState } from 'react';
+
+function ReplyCard({ reply, allReplies, onQuote, onReact }) {
+  // Find the reply this user is quoting, if any
+  const quotedReply = reply.parent_reply_id 
+    ? allReplies.find(r => r.id === reply.parent_reply_id) 
+    : null;
+
+  return (
+    <div className="reply-container" style={{ display: 'flex', border: '1px solid #333', marginBottom: '15px', backgroundColor: '#121212', color: '#fff' }}>
+      
+      {/* Left Column: User Profile Block Info Card */}
+      <div className="author-sidebar" style={{ width: '150px', padding: '15px', borderRight: '1px solid #333', textAlign: 'center' }}>
+        <img src={reply.profiles?.profile_picture || 'default-avatar.png'} alt="avatar" style={{ width: '70px', height: '70px', borderRadius: '50%' }} />
+        <div style={{ fontWeight: 'bold', color: reply.profiles?.custom_theme_color }}>{reply.profiles?.username}</div>
+        {reply.profiles?.custom_badge && <span style={{ fontSize: '11px', background: '#e0a800', padding: '2px 5px', borderRadius: '3px' }}>{reply.profiles.custom_badge}</span>}
+        <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>Rep: {reply.profiles?.reputation}</div>
+      </div>
+
+      {/* Right Column: Main Text Content Message & Reaction Bar Layout */}
+      <div className="reply-body" style={{ flex: 1, padding: '15px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div>
+          {/* Nested Quote Block Block if replying to someone */}
+          {quotedReply && (
+            <div className="quote-block" style={{ borderLeft: '3px solid #e0a800', padding: '8px 12px', background: '#1c1c1c', marginBottom: '10px', fontSize: '13px', italic: 'true', color: '#bbb' }}>
+              <strong>{quotedReply.profiles?.username || 'User'} said:</strong>
+              <p style={{ margin: '4px 0 0 0' }}>{quotedReply.content}</p>
+            </div>
+          )}
+
+          {/* User's Core Message Body Render */}
+          <div style={{ 
+            fontFamily: reply.font_family, 
+            fontSize: reply.font_size, 
+            fontWeight: reply.is_bold ? 'bold' : 'normal', 
+            fontStyle: reply.is_italic ? 'italic' : 'normal', 
+            color: reply.font_color 
+          }}>
+            {reply.content}
+          </div>
+        </div>
+
+        {/* Reaction Controls & Quote Action Trigger Option Buttons */}
+        <div className="reply-actions" style={{ marginTop: '15px', display: 'flex', gap: '10px', alignItems: 'center', fontSize: '13px' }}>
+          <button onClick={() => onReact(reply.id, reply.author_id, 'like')} style={{ background: 'none', border: 'none', color: '#4caf50', cursor: 'pointer' }}>👍 Like ({reply.likes})</button>
+          <button onClick={() => onReact(reply.id, reply.author_id, 'dislike')} style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer' }}>👎 Dislike ({reply.dislikes})</button>
+          <button onClick={() => onReact(reply.id, reply.author_id, 'mega_rep')} style={{ background: '#e0a800', border: 'none', color: '#000', borderRadius: '3px', padding: '2px 6px', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Mega Rep ({reply.mega_reps})</button>
+          <button onClick={() => onReact(reply.id, reply.author_id, 'mega_dislike')} style={{ background: '#bd2130', border: 'none', color: '#fff', borderRadius: '3px', padding: '2px 6px', cursor: 'pointer' }}>💀 Mega Dislike ({reply.mega_dislikes})</button>
+          
+          <button onClick={() => onQuote(reply)} style={{ marginLeft: 'auto', background: '#333', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer' }}>Quote</button>
+        </div>
+      </div>
+
+    </div>
+  );
+}
