@@ -1,16 +1,71 @@
-# React + Vite
+# ROT
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A discipline / self-improvement forum. Dark, ember-toned, no fluff. Real shared
+accounts, threads, replies, voting, and streaks — backed by a Supabase
+Postgres database, so every visitor sees the same forum.
 
-Currently, two official plugins are available:
+## 1. Create a Supabase project
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Go to [supabase.com](https://supabase.com), sign in, and create a new project (the free tier is enough to start).
+2. Wait for it to finish provisioning (a couple of minutes).
+3. In the left sidebar, go to **SQL Editor** -> **New query**.
+4. Open `supabase/schema.sql` from this repo, paste its full contents into the editor, and click **Run**.
+   This creates all the tables, the default categories, and the row-level security policies the app needs.
+5. Go to **Settings -> API**. You'll need two values from this page in the next step:
+   - **Project URL**
+   - **anon public** key (NOT the `service_role` key — never put that key in frontend code)
 
-## React Compiler
+## 2. Configure the app
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Open `.env` and fill in the two values from Supabase:
+   ```
+   VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-public-key
+   ```
 
-## Expanding the ESLint configuration
+## 3. Run it locally
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+Open the printed local URL (usually `http://localhost:5173`). Sign up for an account, post a thread, and confirm it shows up — that confirms the database connection is working end to end.
+
+## 4. Deploy it
+
+This is a static Vite app, so it deploys anywhere that serves static files. The easiest options:
+
+- **Vercel** or **Netlify**: import this GitHub repo, set the build command to `npm run build`, the output directory to `dist`, and add the two `VITE_SUPABASE_*` environment variables in the project's dashboard settings.
+- **GitHub Pages**: build with `npm run build` and publish the `dist` folder, but you'll need to inject the env vars at build time via a GitHub Actions secret, since GitHub Pages has no runtime env var support.
+
+Either way, the `.env` file itself should never be committed (it's already in `.gitignore`) — environment variables get set in your hosting provider's dashboard instead.
+
+## How accounts work
+
+This forum uses its own `rot_users` table with a username + password, not Supabase Auth. That keeps things simple, but it's worth knowing the limits:
+
+- Passwords are hashed client-side before being sent, but this is a lightweight hash, not bcrypt/argon2. Fine for a casual community forum. Don't reuse a password you use anywhere important.
+- Because the app talks to Supabase directly from the browser using the public anon key, the row-level security policies in `schema.sql` are what stop people from editing each other's data — review them if you plan to extend the schema.
+- There's no email verification, password reset, or session expiry. Login state is just "remember this username in the browser" via `localStorage`.
+
+If you want real security later (proper password hashing, sessions, email verification), the cleanest upgrade path is switching to Supabase Auth and moving writes behind Supabase Edge Functions instead of calling the database directly from the browser.
+
+## What's included
+
+- Sign up / sign in
+- Categories: discipline & habits, training, mind & focus, money & work, the dispatch
+- Threads and replies, all stored in Postgres
+- Upvote / downvote on any post, with toggle-off on a second click
+- Profiles with bio, post count, rep, and a daily check-in streak
+
+## What's not included (yet)
+
+- Moderator/admin tools (delete posts, ban users)
+- Editing or deleting your own posts after submission
+- Rep actually being awarded from votes (the `rep` column exists but nothing increments it yet — votes currently only affect post score, not user rep)
+- Email verification or password reset
