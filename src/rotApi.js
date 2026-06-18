@@ -162,15 +162,6 @@ export async function fetchPostsForThread(threadId) {
   return { data: enriched, error: null };
 }
 
-export async function createReply({ threadId, author, body }) {
-  const { data, error } = await supabase
-    .from("rot_posts")
-    .insert({ thread_id: threadId, author, body, is_op: false })
-    .select()
-    .single();
-  if (!error) await incrementUserPosts(author);
-  return { data, error };
-}
 
 /* ---------- voting ---------- */
 // One row per (post, user). Re-clicking same direction deletes the vote (toggle off).
@@ -218,8 +209,6 @@ export async function checkIn(username) {
   const newStreak = isYesterday(user.last_check_in, now) ? (user.streak || 0) + 1 : 1;
   return updateUser(username, { streak: newStreak, last_check_in: new Date(now).toISOString() });
 }
-import { supabase } from './supabaseClient';
-
 // Function to handle the reputation logic (+1, -1, +10, -10)
 export const handleReaction = async (postId, authorId, userId, type) => {
   let repChange = 0;
@@ -257,8 +246,6 @@ export const initializeAdminUser = async () => {
     ]);
   }
 };
-import { supabase } from './supabaseClient';
-
 // 1. Fetch all replies for a thread including author profile decorations
 export const fetchThreadReplies = async (threadId) => {
   const { data, error } = await supabase
