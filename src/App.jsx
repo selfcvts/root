@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import {
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
+import { 
+  fetchThreadReplies, 
+  handleReplyReaction,
   fetchCategories,
   fetchThreadCounts,
   signUp,
@@ -13,8 +16,8 @@ import {
   createReply,
   castVote,
   checkIn,
-  isSameDay,
-} from "./rotApi";
+  isSameDay
+} from './rotApi';
 
 const SESSION_KEY = "rot_session_username";
 
@@ -788,9 +791,6 @@ function ReplyCard({ reply, allReplies, onQuote, onReact }) {
     </div>
   );
 }
-import React, { useState, useEffect } from 'react';
-import { fetchThreadReplies, handleReplyReaction } from './rotApi';
-
 function ThreadView({ threadId }) {
   const [replies, setReplies] = useState([]);
 
